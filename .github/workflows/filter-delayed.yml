@@ -17,30 +17,30 @@ jobs:
           curl -s https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations.json -o all.json
 
           cat <<EOF > filter.py
-import json, time
+          import json, time
 
-with open("all.json") as f:
-    data = json.load(f)
+          with open("all.json") as f:
+              data = json.load(f)
 
-now = time.time()
-filtered = []
+          now = time.time()
+          filtered = []
 
-for point in data:
-    ts = point.get("timestamp")
-    if isinstance(ts, str):
-        try:
-            ts = int(ts)
-        except:
-            try:
-                ts = int(time.mktime(time.strptime(ts, "%Y-%m-%dT%H:%M:%SZ")))
-            except:
-                continue
-    if ts < now - 86400:
-        filtered.append(point)
+          for point in data:
+              ts = point.get("timestamp")
+              if isinstance(ts, str):
+                  try:
+                      ts = int(ts)
+                  except:
+                      try:
+                          ts = int(time.mktime(time.strptime(ts, "%Y-%m-%dT%H:%M:%SZ")))
+                      except:
+                          continue
+              if ts < now - 86400:
+                  filtered.append(point)
 
-with open("delayed_locations.json", "w") as f:
-    json.dump(filtered, f, indent=2)
-EOF
+          with open("delayed_locations.json", "w") as f:
+              json.dump(filtered, f, indent=2)
+          EOF
 
           python3 filter.py
 
