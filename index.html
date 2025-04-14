@@ -2,7 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8" />
-  <title>AJ's Public GPS Map</title>
+  <title>AJ’s Delayed GPS Map</title>
   <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no" />
   <style>
     body, html { margin: 0; padding: 0; height: 100%; }
@@ -31,30 +31,29 @@
   fetch('https://raw.githubusercontent.com/ajthisway/aj-map-public/main/delayed_locations.json')
     .then(res => res.json())
     .then(data => {
-      if (!data || data.length === 0) return;
-
       const coords = data.map(p => [parseFloat(p.lon), parseFloat(p.lat)]);
+
+      if (coords.length === 0) return;
 
       data.forEach(point => {
         const coord = [parseFloat(point.lon), parseFloat(point.lat)];
         const date = new Date(isNaN(point.timestamp) ? point.timestamp : point.timestamp * 1000);
         const label = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
-        const popupHTML = `
+        const html = `
           <div style="font-family: sans-serif; padding-right: 10px; max-width: 180px;">
             <strong>AJ's Location</strong><br/>
             ${label}
           </div>
         `;
 
-        new mapboxgl.Marker({ color: "#e74c3c" })
+        new mapboxgl.Marker()
           .setLngLat(coord)
-          .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(popupHTML))
+          .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(html))
           .addTo(map);
       });
 
-      // Red line
-      map.on('load', () => {
+      if (coords.length > 1) {
         map.addSource('route', {
           type: 'geojson',
           data: {
@@ -70,20 +69,14 @@
           id: 'route',
           type: 'line',
           source: 'route',
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-          },
-          paint: {
-            'line-color': '#ff0000',
-            'line-width': 4
-          }
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#ff0000', 'line-width': 3 }
         });
+      }
 
-        const lastCoord = coords[coords.length - 1];
-        map.setCenter(lastCoord);
-        map.setZoom(13);
-      });
+      const last = coords[coords.length - 1];
+      map.setCenter(last);
+      map.setZoom(12);
     });
 </script>
 </body>
