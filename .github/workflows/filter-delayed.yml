@@ -9,8 +9,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout this repo
+      - name: Checkout the repo
         uses: actions/checkout@v3
+        with:
+          persist-credentials: false  # <-- disables default bot credentials
 
       - name: Fetch and filter delayed points
         run: |
@@ -44,7 +46,7 @@ jobs:
 
           python3 filter.py
 
-      - name: Commit filtered file
+      - name: Commit and push the updated file
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
         run: |
@@ -53,4 +55,4 @@ jobs:
           git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}
           git add delayed_locations.json
           git commit -m "Update delayed map" || echo "No changes"
-          git push
+          git push origin main
