@@ -32,7 +32,6 @@
     .then(res => res.json())
     .then(data => {
       const coords = data.map(p => [parseFloat(p.lon), parseFloat(p.lat)]);
-
       if (coords.length === 0) return;
 
       data.forEach(point => {
@@ -53,31 +52,38 @@
           .addTo(map);
       });
 
-      if (coords.length > 1) {
-        map.addSource('route', {
-          type: 'geojson',
-          data: {
-            type: 'Feature',
-            geometry: {
-              type: 'LineString',
-              coordinates: coords
+      map.on('load', () => {
+        if (coords.length > 1) {
+          map.addSource('route', {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: coords
+              }
             }
-          }
-        });
+          });
 
-        map.addLayer({
-          id: 'route',
-          type: 'line',
-          source: 'route',
-          layout: { 'line-join': 'round', 'line-cap': 'round' },
-          paint: { 'line-color': '#ff0000', 'line-width': 3 }
-        });
-      }
+          map.addLayer({
+            id: 'route',
+            type: 'line',
+            source: 'route',
+            layout: {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
+            paint: {
+              'line-color': '#ff0000',
+              'line-width': 3
+            }
+          });
+        }
 
-      // 🔍 Always zoom to the most recent point
-      const last = coords[coords.length - 1];
-      map.setCenter(last);
-      map.setZoom(12);
+        const last = coords[coords.length - 1];
+        map.setCenter(last);
+        map.setZoom(12);
+      });
     });
 </script>
 </body>
