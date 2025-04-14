@@ -1,0 +1,42 @@
+name: Filter Delayed GPS Points
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"  # every 30 minutes
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v3
+
+      - name: Fetch and filter delayed points
+        run: |
+          curl -s https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations.json -o all.json
+          echo "Filtering points older than 24 hours..."
+          python3 <<EOF
+import json, time
+with open('all.json') as f:
+    data = json.load(f)
+now = time.time()
+filtered = []
+for point in data:
+    ts = point.get("timestamp")
+    if isinstance(ts, str):
+        try: ts = int(ts)
+        except: ts = int(time.mktime(time.strptime(ts, "%Y-%m-%dT%H:%M:%SZ")))
+    if ts < now - 86400:
+        filtered.append(point)
+with open('delayed_locations.json', 'w') as f:
+    json.dump(filtered, f, indent=2)
+EOF
+
+      - name: Commit filtered file
+        run: |
+          git config --global user.name "aj-map-bot"
+          git config --global user.email "aj@users.noreply.github.com"
+          git add delayed_locations.json
+          git commit -m "Update delayed map" || echo "No changes"
+          git push
