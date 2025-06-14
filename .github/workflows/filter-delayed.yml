@@ -26,22 +26,40 @@ jobs:
 
           now = time.time()
           filtered = []
+          iso_points = []
 
           for point in data:
               ts = point.get("timestamp")
+              original_ts = ts
+              parsed_ts = None
+
               if isinstance(ts, str):
                   try:
-                      ts = int(ts)
+                      parsed_ts = int(ts)
                   except:
                       try:
-                          ts = int(time.mktime(time.strptime(ts, "%Y-%m-%dT%H:%M:%SZ")))
+                          parsed_ts = int(time.mktime(time.strptime(ts, "%Y-%m-%dT%H:%M:%SZ")))
                       except:
                           try:
-                              ts = int(time.mktime(time.strptime(ts, "%Y-%m-%dT%H:%M:%S.%fZ")))
+                              parsed_ts = int(time.mktime(time.strptime(ts, "%Y-%m-%dT%H:%M:%S.%fZ")))
+                              iso_points.append((parsed_ts, point))  # ISO with milliseconds: thin later
+                              continue  # Skip adding to filtered for now
                           except:
                               continue
-              if isinstance(ts, (int, float)) and ts < now - 86400:
+              else:
+                  parsed_ts = ts
+
+              if isinstance(parsed_ts, (int, float)) and parsed_ts < now - 86400:
                   filtered.append(point)
+
+          # Thin ISO points (those with milliseconds) based on timestamp gaps
+          iso_points.sort()  # sort by timestamp
+          last_ts = None
+          for ts, point in iso_points:
+              if ts < now - 86400:
+                  if last_ts is None or ts - last_ts >= 599:
+                      filtered.append(point)
+                      last_ts = ts
 
           with open("delayed_locations.json", "w") as f:
               json.dump(filtered, f, indent=2)
