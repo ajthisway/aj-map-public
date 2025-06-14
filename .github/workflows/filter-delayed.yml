@@ -18,28 +18,32 @@ jobs:
         run: |
           curl -s https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations.json -o all.json
 
-          echo "import json, time, datetime
-with open('all.json') as f:
+          cat <<EOF > filter.py
+import json, time, datetime
+
+with open("all.json") as f:
     data = json.load(f)
 
 now = time.time()
 filtered = []
 
 for point in data:
-    ts = point.get('timestamp')
+    ts = point.get("timestamp")
+
+    # Convert ISO 8601 to Unix timestamp if it's a string
     if isinstance(ts, str):
         try:
-            dt = datetime.datetime.strptime(ts, '%Y-%m-%dT%H:%M:%S.%fZ')
+            dt = datetime.datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S.%fZ")
             ts = time.mktime(dt.timetuple())
         except Exception:
-            continue
+            continue  # skip point if timestamp can't be parsed
 
     if isinstance(ts, (int, float)) and ts < now - 86400:
         filtered.append(point)
 
-with open('delayed_locations.json', 'w') as f:
+with open("delayed_locations.json", "w") as f:
     json.dump(filtered, f, indent=2)
-" > filter.py
+EOF
 
           python3 filter.py
 
