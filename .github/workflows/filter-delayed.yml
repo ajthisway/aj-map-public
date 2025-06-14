@@ -30,7 +30,6 @@ jobs:
 
           for point in data:
               ts = point.get("timestamp")
-              original_ts = ts
               parsed_ts = None
 
               if isinstance(ts, str):
@@ -53,7 +52,7 @@ jobs:
                   filtered.append(point)
 
           # Thin ISO points (those with milliseconds) based on timestamp gaps
-          iso_points.sort()  # sort by timestamp
+          iso_points.sort(key=lambda x: x[0])  # sort by timestamp
           last_ts = None
           for ts, point in iso_points:
               if ts < now - 86400:
