@@ -1,58 +1,32 @@
-name: Filter Delayed GPS Points
+- name: Fetch and filter delayed points
+  run: |
+    curl -s https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations.json -o all.json
 
-on:
-  schedule:
-    - cron: "*/10 * * * *"
-  workflow_dispatch:
+    cat <<EOF > filter.py
+import json, time, datetime
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout the repo
-        uses: actions/checkout@v3
-        with:
-          persist-credentials: false  # <-- disables default bot credentials
+with open("all.json") as f:
+    data = json.load(f)
 
-      - name: Fetch and filter delayed points
-        run: |
-          curl -s https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations.json -o all.json
+now = time.time()
+filtered = []
 
-          cat <<EOF > filter.py
-          import json, time
+for point in data:
+    ts = point.get("timestamp")
 
-          with open("all.json") as f:
-              data = json.load(f)
+    # Convert ISO 8601 to Unix timestamp if it's a string
+    if isinstance(ts, str):
+        try:
+            dt = datetime.datetime.strptime(ts, "%Y-%m-%dT%H:%M:%S.%fZ")
+            ts = time.mktime(dt.timetuple())
+        except Exception as e:
+            continue  # skip point if timestamp can't be parsed
 
-          now = time.time()
-          filtered = []
+    if isinstance(ts, (int, float)) and ts < now - 86400:
+        filtered.append(point)
 
-          for point in data:
-              ts = point.get("timestamp")
-              if isinstance(ts, str):
-                  try:
-                      ts = int(ts)
-                  except:
-                      try:
-                          ts = int(time.mktime(time.strptime(ts, "%Y-%m-%dT%H:%M:%SZ")))
-                      except:
-                          continue
-              if ts < now - 86400:
-                  filtered.append(point)
+with open("delayed_locations.json", "w") as f:
+    json.dump(filtered, f, indent=2)
+EOF
 
-          with open("delayed_locations.json", "w") as f:
-              json.dump(filtered, f, indent=2)
-          EOF
-
-          python3 filter.py
-
-      - name: Commit and push the updated file
-        env:
-          GH_TOKEN: ${{ secrets.GH_PAT }}
-        run: |
-          git config --global user.name "aj-map-bot"
-          git config --global user.email "aj@users.noreply.github.com"
-          git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}
-          git add delayed_locations.json
-          git commit -m "Update delayed map" || echo "No changes"
-          git push origin main
+    python3 filter.py
