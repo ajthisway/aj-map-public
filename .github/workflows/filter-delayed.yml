@@ -32,11 +32,14 @@ jobs:
           echo "    if isinstance(ts, str):" >> filter.py
           echo "        try:" >> filter.py
           echo "            dt = datetime.datetime.strptime(ts, '%Y-%m-%dT%H:%M:%S.%fZ')" >> filter.py
-          echo "            ts = time.mktime(dt.timetuple())" >> filter.py
+          echo "            ts = dt.timestamp()" >> filter.py
           echo "        except Exception:" >> filter.py
-          echo "            continue" >> filter.py
+          echo "            continue  # skip if invalid string format" >> filter.py
           echo "" >> filter.py
-          echo "    if isinstance(ts, (int, float)) and ts < now - 86400:" >> filter.py
+          echo "    elif not isinstance(ts, (int, float)):" >> filter.py
+          echo "        continue  # skip if ts is neither str nor number" >> filter.py
+          echo "" >> filter.py
+          echo "    if ts < now - 86400:" >> filter.py
           echo "        filtered.append(point)" >> filter.py
           echo "" >> filter.py
           echo "with open('delayed_locations.json', 'w') as f:" >> filter.py
