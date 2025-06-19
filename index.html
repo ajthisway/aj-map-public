@@ -29,16 +29,38 @@
   });
 
   Promise.all([
-    fetch('https://raw.githubusercontent.com/ajthisway/aj-map-public/main/locations_archive.json').then(res => res.json()),
-    fetch('https://raw.githubusercontent.com/ajthisway/aj-map-public/main/delayed_locations.json').then(res => res.json())
+    fetch('https://raw.githubusercontent.com/ajthisway/aj-map-public/main/delayed_locations.json').then(res => res.json()),
+    fetch('https://raw.githubusercontent.com/ajthisway/aj-map-public/main/locations_archive.json').then(res => res.json())
   ])
-  .then(([archiveData, delayedData]) => {
-    const data = [...archiveData, ...delayedData];
+  .then(([delayedData, archiveData]) => {
+    const combined = [...delayedData, ...archiveData];
 
-    const coords = data.map(p => [parseFloat(p.lon), parseFloat(p.lat)]);
+    // Sort by timestamp
+    combined.sort((a, b) => {
+      const t1 = typeof a.timestamp === "string" ? Date.parse(a.timestamp) : a.timestamp * 1000;
+      const t2 = typeof b.timestamp === "string" ? Date.parse(b.timestamp) : b.timestamp * 1000;
+      return t1 - t2;
+    });
+
+    // Filter to keep only one point every 10 mins (599 sec)
+    let filteredData = [];
+    let lastTimestamp = 0;
+
+    combined.forEach(point => {
+      let ts = point.timestamp;
+      if (typeof ts === "string") {
+        ts = Date.parse(ts) / 1000;
+      }
+      if (!lastTimestamp || ts - lastTimestamp >= 599) {
+        filteredData.push(point);
+        lastTimestamp = ts;
+      }
+    });
+
+    const coords = filteredData.map(p => [parseFloat(p.lon), parseFloat(p.lat)]);
     if (coords.length === 0) return;
 
-    data.forEach(point => {
+    filteredData.forEach(point => {
       const coord = [parseFloat(point.lon), parseFloat(point.lat)];
       const date = new Date(isNaN(point.timestamp) ? point.timestamp : point.timestamp * 1000);
       const label = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
