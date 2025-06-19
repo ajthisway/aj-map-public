@@ -28,63 +28,67 @@
     zoom: 2
   });
 
-  fetch('https://raw.githubusercontent.com/ajthisway/aj-map-public/main/delayed_locations.json')
-    .then(res => res.json())
-    .then(data => {
-      const coords = data.map(p => [parseFloat(p.lon), parseFloat(p.lat)]);
-      if (coords.length === 0) return;
+  Promise.all([
+    fetch('https://raw.githubusercontent.com/ajthisway/aj-map-public/main/locations_archive.json').then(res => res.json()),
+    fetch('https://raw.githubusercontent.com/ajthisway/aj-map-public/main/delayed_locations.json').then(res => res.json())
+  ])
+  .then(([archiveData, delayedData]) => {
+    const data = [...archiveData, ...delayedData];
 
-      data.forEach(point => {
-        const coord = [parseFloat(point.lon), parseFloat(point.lat)];
-        const date = new Date(isNaN(point.timestamp) ? point.timestamp : point.timestamp * 1000);
-        const label = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    const coords = data.map(p => [parseFloat(p.lon), parseFloat(p.lat)]);
+    if (coords.length === 0) return;
 
-        const html = `
-          <div style="font-family: sans-serif; padding-right: 10px; max-width: 180px;">
-            <strong>AJ's Location</strong><br/>
-            ${label}
-          </div>
-        `;
+    data.forEach(point => {
+      const coord = [parseFloat(point.lon), parseFloat(point.lat)];
+      const date = new Date(isNaN(point.timestamp) ? point.timestamp : point.timestamp * 1000);
+      const label = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
-        new mapboxgl.Marker()
-          .setLngLat(coord)
-          .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(html))
-          .addTo(map);
-      });
+      const html = `
+        <div style="font-family: sans-serif; padding-right: 10px; max-width: 180px;">
+          <strong>AJ's Location</strong><br/>
+          ${label}
+        </div>
+      `;
 
-      map.on('load', () => {
-        if (coords.length > 1) {
-          map.addSource('route', {
-            type: 'geojson',
-            data: {
-              type: 'Feature',
-              geometry: {
-                type: 'LineString',
-                coordinates: coords
-              }
-            }
-          });
-
-          map.addLayer({
-            id: 'route',
-            type: 'line',
-            source: 'route',
-            layout: {
-              'line-join': 'round',
-              'line-cap': 'round'
-            },
-            paint: {
-              'line-color': '#ff0000',
-              'line-width': 3
-            }
-          });
-        }
-
-        const last = coords[coords.length - 1];
-        map.setCenter(last);
-        map.setZoom(12);
-      });
+      new mapboxgl.Marker()
+        .setLngLat(coord)
+        .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(html))
+        .addTo(map);
     });
+
+    map.on('load', () => {
+      if (coords.length > 1) {
+        map.addSource('route', {
+          type: 'geojson',
+          data: {
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: coords
+            }
+          }
+        });
+
+        map.addLayer({
+          id: 'route',
+          type: 'line',
+          source: 'route',
+          layout: {
+            'line-join': 'round',
+            'line-cap': 'round'
+          },
+          paint: {
+            'line-color': '#ff0000',
+            'line-width': 3
+          }
+        });
+      }
+
+      const last = coords[coords.length - 1];
+      map.setCenter(last);
+      map.setZoom(12);
+    });
+  });
 </script>
 </body>
 </html>
