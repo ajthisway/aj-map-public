@@ -28,89 +28,90 @@
     zoom: 2
   });
 
-  Promise.all([
-    fetch('https://raw.githubusercontent.com/ajthisway/aj-map-public/main/delayed_locations.json').then(res => res.json()),
-    fetch('https://raw.githubusercontent.com/ajthisway/aj-map-public/main/locations_archive.json').then(res => res.json())
-  ])
-  .then(([delayedData, archiveData]) => {
-    const combined = [...delayedData, ...archiveData];
+  const sources = [
+    'https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations.json',
+    'https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations_archive.json'
+  ];
 
-    // Sort by timestamp
-    combined.sort((a, b) => {
-      const t1 = typeof a.timestamp === "string" ? Date.parse(a.timestamp) : a.timestamp * 1000;
-      const t2 = typeof b.timestamp === "string" ? Date.parse(b.timestamp) : b.timestamp * 1000;
-      return t1 - t2;
-    });
+  Promise.all(sources.map(url => fetch(url).then(res => res.json())))
+    .then(([live, archive]) => {
+      const allPoints = [...archive, ...live];
+      const now = Date.now();
 
-    // Filter to keep only one point every 10 mins (599 sec)
-    let filteredData = [];
-    let lastTimestamp = 0;
+      const filtered = [];
+      const usedTimestamps = new Set();
 
-    combined.forEach(point => {
-      let ts = point.timestamp;
-      if (typeof ts === "string") {
-        ts = Date.parse(ts) / 1000;
+      for (const point of allPoints) {
+        let ts = point.timestamp;
+        if (typeof ts === 'string') {
+          ts = Date.parse(ts);
+        } else {
+          ts = ts * 1000;
+        }
+
+        if (!isNaN(ts) && ts <= now - 86400000) {
+          const rounded = Math.floor(ts / 600000) * 600000; // round to nearest 10 minutes
+          if (!usedTimestamps.has(rounded)) {
+            usedTimestamps.add(rounded);
+            filtered.push({ ...point, timestamp: ts });
+          }
+        }
       }
-      if (!lastTimestamp || ts - lastTimestamp >= 599) {
-        filteredData.push(point);
-        lastTimestamp = ts;
-      }
-    });
 
-    const coords = filteredData.map(p => [parseFloat(p.lon), parseFloat(p.lat)]);
-    if (coords.length === 0) return;
+      const coords = filtered.map(p => [parseFloat(p.lon), parseFloat(p.lat)]);
+      if (coords.length === 0) return;
 
-    filteredData.forEach(point => {
-      const coord = [parseFloat(point.lon), parseFloat(point.lat)];
-      const date = new Date(isNaN(point.timestamp) ? point.timestamp : point.timestamp * 1000);
-      const label = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+      filtered.forEach(point => {
+        const coord = [parseFloat(point.lon), parseFloat(point.lat)];
+        const date = new Date(point.timestamp);
+        const label = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
-      const html = `
-        <div style="font-family: sans-serif; padding-right: 10px; max-width: 180px;">
-          <strong>AJ's Location</strong><br/>
-          ${label}
-        </div>
-      `;
+        const html = `
+          <div style="font-family: sans-serif; padding-right: 10px; max-width: 180px;">
+            <strong>AJ's Location</strong><br/>
+            ${label}
+          </div>
+        `;
 
-      new mapboxgl.Marker()
-        .setLngLat(coord)
-        .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(html))
-        .addTo(map);
-    });
+        new mapboxgl.Marker()
+          .setLngLat(coord)
+          .setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(html))
+          .addTo(map);
+      });
 
-    map.on('load', () => {
-      if (coords.length > 1) {
-        map.addSource('route', {
-          type: 'geojson',
-          data: {
-            type: 'Feature',
-            geometry: {
-              type: 'LineString',
-              coordinates: coords
+      map.on('load', () => {
+        if (coords.length > 1) {
+          map.addSource('route', {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              geometry: {
+                type: 'LineString',
+                coordinates: coords
+              }
             }
-          }
-        });
+          });
 
-        map.addLayer({
-          id: 'route',
-          type: 'line',
-          source: 'route',
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round'
-          },
-          paint: {
-            'line-color': '#ff0000',
-            'line-width': 3
-          }
-        });
-      }
+          map.addLayer({
+            id: 'route',
+            type: 'line',
+            source: 'route',
+            layout: {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
+            paint: {
+              'line-color': '#ff0000',
+              'line-width': 3
+            }
+          });
+        }
 
-      const last = coords[coords.length - 1];
-      map.setCenter(last);
-      map.setZoom(12);
+        const last = coords[coords.length - 1];
+        map.setCenter(last);
+        map.setZoom(12);
+      });
     });
-  });
 </script>
 </body>
 </html>
