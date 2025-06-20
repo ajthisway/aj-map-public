@@ -41,7 +41,6 @@
       zoom: 2
     });
 
-    // Load and filter both datasets
     const sources = [
       'https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations.json',
       'https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations_archive.json'
@@ -51,36 +50,39 @@
       .then(allData => {
         const merged = allData.flat();
 
-        // Filter points older than 24 hours and >10 mins apart
         const now = Date.now();
         const shown = [];
 
-        merged.sort((a, b) => {
-          const ta = new Date(a.timestamp).getTime() || parseInt(a.timestamp) * 1000;
-          const tb = new Date(b.timestamp).getTime() || parseInt(b.timestamp) * 1000;
-          return ta - tb;
-        });
-
-        let lastTime = 0;
-        merged.forEach(p => {
-          let ts = typeof p.timestamp === 'string'
-            ? new Date(p.timestamp).getTime()
-            : parseInt(p.timestamp) * 1000;
-
-          if (isNaN(ts)) return;
-          if (ts > now - 86400000) return; // skip if less than 24h ago
-          if (ts - lastTime >= 10 * 60 * 1000) {
-            shown.push(p);
-            lastTime = ts;
+        const parseTimestamp = ts => {
+          if (typeof ts === 'string') {
+            const parsed = Date.parse(ts);
+            return isNaN(parsed) ? null : parsed;
           }
-        });
+          if (typeof ts === 'number' || /^\d+$/.test(ts)) {
+            return parseInt(ts) * 1000;
+          }
+          return null;
+        };
+
+        merged
+          .map(p => ({
+            ...p,
+            parsedTs: parseTimestamp(p.timestamp)
+          }))
+          .filter(p => p.parsedTs && p.parsedTs < now - 86400000) // only older than 24h
+          .sort((a, b) => a.parsedTs - b.parsedTs)
+          .forEach(p => {
+            if (shown.length === 0 || p.parsedTs - shown[shown.length - 1].parsedTs >= 10 * 60 * 1000) {
+              shown.push(p);
+            }
+          });
 
         const coords = shown.map(p => [parseFloat(p.lon), parseFloat(p.lat)]);
         if (coords.length === 0) return;
 
         shown.forEach(point => {
           const coord = [parseFloat(point.lon), parseFloat(point.lat)];
-          const date = new Date(isNaN(point.timestamp) ? point.timestamp : point.timestamp * 1000);
+          const date = new Date(point.parsedTs);
           const label = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
           const html = `
@@ -130,7 +132,6 @@
         });
       });
 
-    // Fullscreen button functionality
     document.getElementById('fullscreenBtn').addEventListener('click', () => {
       const mapContainer = document.getElementById('map');
       if (mapContainer.requestFullscreen) {
