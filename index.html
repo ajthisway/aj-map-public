@@ -28,42 +28,43 @@
     zoom: 2
   });
 
-  const sources = [
-    'https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations.json',
-    'https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations_archive.json'
-  ];
+  const archiveUrl = 'https://raw.githubusercontent.com/ajthisway/aj-map-public/main/locations_archive.json';
+  const recentUrl = 'https://raw.githubusercontent.com/ajthisway/aj-map-public/main/locations.json';
 
-  Promise.all(sources.map(url => fetch(url).then(res => res.json())))
-    .then(([live, archive]) => {
-      const allPoints = [...archive, ...live];
+  Promise.all([fetch(archiveUrl).then(r => r.json()), fetch(recentUrl).then(r => r.json())])
+    .then(([archive, recent]) => {
       const now = Date.now();
+      const filteredPoints = [];
 
-      const filtered = [];
-      const usedTimestamps = new Set();
+      const allPoints = [...archive, ...recent];
 
-      for (const point of allPoints) {
-        let ts = point.timestamp;
+      function parseTimestamp(ts) {
+        if (typeof ts === 'number') return ts * 1000;
         if (typeof ts === 'string') {
-          ts = Date.parse(ts);
-        } else {
-          ts = ts * 1000;
+          const parsed = Date.parse(ts);
+          if (!isNaN(parsed)) return parsed;
         }
+        return null;
+      }
 
-        if (!isNaN(ts) && ts <= now - 86400000) {
-          const rounded = Math.floor(ts / 600000) * 600000; // round to nearest 10 minutes
-          if (!usedTimestamps.has(rounded)) {
-            usedTimestamps.add(rounded);
-            filtered.push({ ...point, timestamp: ts });
-          }
+      let lastIncludedTime = 0;
+      for (const point of allPoints) {
+        const time = parseTimestamp(point.timestamp);
+        if (!time) continue;
+        if (time > now - 86400000) continue; // skip if newer than 24 hours
+        if (time - lastIncludedTime >= 10 * 60 * 1000) {
+          filteredPoints.push({ ...point, parsedTime: time });
+          lastIncludedTime = time;
         }
       }
 
-      const coords = filtered.map(p => [parseFloat(p.lon), parseFloat(p.lat)]);
-      if (coords.length === 0) return;
+      if (filteredPoints.length === 0) return;
 
-      filtered.forEach(point => {
+      const coords = filteredPoints.map(p => [parseFloat(p.lon), parseFloat(p.lat)]);
+
+      filteredPoints.forEach(point => {
         const coord = [parseFloat(point.lon), parseFloat(point.lat)];
-        const date = new Date(point.timestamp);
+        const date = new Date(point.parsedTime);
         const label = date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 
         const html = `
