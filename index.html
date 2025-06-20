@@ -28,8 +28,8 @@
     zoom: 2
   });
 
-  const archiveUrl = 'https://raw.githubusercontent.com/ajthisway/aj-map-public/main/locations_archive.json';
-  const recentUrl = 'https://raw.githubusercontent.com/ajthisway/aj-map-public/main/locations.json';
+  const archiveUrl = 'https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations_archive.json';
+  const recentUrl = 'https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations.json';
 
   Promise.all([
     fetch(archiveUrl).then(r => r.json()),
@@ -42,9 +42,9 @@
       const filteredPoints = [];
 
       function parseTimestamp(ts) {
-        if (typeof ts === 'number') return ts * 1000; // assume Unix time in seconds
+        if (typeof ts === 'number') return ts * 1000;
         if (typeof ts === 'string') {
-          if (!isNaN(ts)) return parseInt(ts) * 1000; // numeric string
+          if (!isNaN(ts)) return parseInt(ts) * 1000;
           const parsed = Date.parse(ts);
           if (!isNaN(parsed)) return parsed;
         }
@@ -55,7 +55,7 @@
       for (const point of allData) {
         const time = parseTimestamp(point.timestamp);
         if (!time) continue;
-        if (time > now - 86400000) continue; // newer than 24h, skip
+        if (time > now - 86400000) continue; // skip if newer than 24 hours
         if (time - lastTime >= 10 * 60 * 1000) {
           filteredPoints.push({ ...point, _parsedTime: time });
           lastTime = time;
