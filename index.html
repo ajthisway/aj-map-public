@@ -11,17 +11,23 @@
       font-size: 14px;
       line-height: 1.4;
     }
-    #fullscreenBtn {
+    #fullscreenBtn, #distanceDisplay {
       position: absolute;
-      top: 10px;
-      right: 10px;
       z-index: 1000;
       padding: 8px 12px;
       font-size: 14px;
       background-color: white;
       border: 1px solid #ccc;
-      cursor: pointer;
       border-radius: 4px;
+    }
+    #fullscreenBtn {
+      top: 10px;
+      right: 10px;
+      cursor: pointer;
+    }
+    #distanceDisplay {
+      top: 10px;
+      left: 10px;
     }
   </style>
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
@@ -29,6 +35,7 @@
 </head>
 <body>
 <div id="map"></div>
+<div id="distanceDisplay">Total Distance: …</div>
 <button id="fullscreenBtn">⛶ Fullscreen</button>
 
 <script>
@@ -43,6 +50,15 @@
 
   const archiveUrl = 'https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations_archive.json';
   const recentUrl = 'https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations.json';
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radius of Earth in km
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) *
+              Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
 
   Promise.all([
     fetch(archiveUrl).then(r => r.json()),
@@ -68,7 +84,7 @@
       for (const point of allData) {
         const time = parseTimestamp(point.timestamp);
         if (!time) continue;
-        if (time > now - 86400000) continue; // skip if newer than 24 hours
+        if (time > now - 86400000) continue;
         if (time - lastTime >= 10 * 60 * 1000) {
           filteredPoints.push({ ...point, _parsedTime: time });
           lastTime = time;
@@ -76,6 +92,15 @@
       }
 
       if (filteredPoints.length === 0) return;
+
+      let totalDistance = 0;
+      for (let i = 1; i < filteredPoints.length; i++) {
+        const p1 = filteredPoints[i - 1];
+        const p2 = filteredPoints[i];
+        totalDistance += haversine(parseFloat(p1.lat), parseFloat(p1.lon), parseFloat(p2.lat), parseFloat(p2.lon));
+      }
+
+      document.getElementById('distanceDisplay').innerText = `Total Distance: ${totalDistance.toFixed(2)} km`;
 
       filteredPoints.forEach(point => {
         const coord = [parseFloat(point.lon), parseFloat(point.lat)];
