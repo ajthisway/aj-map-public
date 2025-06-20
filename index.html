@@ -7,36 +7,38 @@
   <style>
     body, html { margin: 0; padding: 0; height: 100%; }
     #map { width: 100%; height: 100%; }
-    .mapboxgl-popup-content {
-      font-size: 14px;
-      line-height: 1.4;
-    }
-    #fullscreenBtn, #distanceDisplay {
+    #fullscreen-btn {
       position: absolute;
-      z-index: 1000;
-      padding: 8px 12px;
-      font-size: 14px;
-      background-color: white;
-      border: 1px solid #ccc;
-      border-radius: 4px;
-    }
-    #fullscreenBtn {
       top: 10px;
       right: 10px;
+      background: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 14px;
       cursor: pointer;
+      z-index: 1;
     }
-    #distanceDisplay {
-      top: 10px;
+    #distance-display {
+      position: absolute;
+      bottom: 10px;
       left: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: sans-serif;
+      font-size: 14px;
+      z-index: 1;
     }
   </style>
   <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
   <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet" />
 </head>
 <body>
+<button id="fullscreen-btn">⛶ Fullscreen</button>
+<div id="distance-display"></div>
 <div id="map"></div>
-<div id="distanceDisplay">Total Distance: …</div>
-<button id="fullscreenBtn">⛶ Fullscreen</button>
 
 <script>
   mapboxgl.accessToken = 'pk.eyJ1IjoiYWp0aGlzd2F5IiwiYSI6ImNtOHZlZmc2YTB2OTEybnI1ZGcyemtsbmoifQ.g2z2Lp2Ko0SsAnV7BdYyYg';
@@ -48,17 +50,17 @@
     zoom: 2
   });
 
+  document.getElementById("fullscreen-btn").addEventListener("click", () => {
+    const el = document.documentElement;
+    if (!document.fullscreenElement) {
+      el.requestFullscreen();
+    } else {
+      document.exitFullscreen();
+    }
+  });
+
   const archiveUrl = 'https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations_archive.json';
   const recentUrl = 'https://raw.githubusercontent.com/ajthisway/aj-map-live/main/locations.json';
-
-  function haversine(lat1, lon1, lat2, lon2) {
-    const R = 6371; // Radius of Earth in km
-    const dLat = (lat2 - lat1) * Math.PI / 180;
-    const dLon = (lon2 - lon1) * Math.PI / 180;
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) *
-              Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
-    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  }
 
   Promise.all([
     fetch(archiveUrl).then(r => r.json()),
@@ -84,7 +86,7 @@
       for (const point of allData) {
         const time = parseTimestamp(point.timestamp);
         if (!time) continue;
-        if (time > now - 86400000) continue;
+        if (time > now - 86400000) continue; // skip if newer than 24 hours
         if (time - lastTime >= 10 * 60 * 1000) {
           filteredPoints.push({ ...point, _parsedTime: time });
           lastTime = time;
@@ -92,15 +94,6 @@
       }
 
       if (filteredPoints.length === 0) return;
-
-      let totalDistance = 0;
-      for (let i = 1; i < filteredPoints.length; i++) {
-        const p1 = filteredPoints[i - 1];
-        const p2 = filteredPoints[i];
-        totalDistance += haversine(parseFloat(p1.lat), parseFloat(p1.lon), parseFloat(p2.lat), parseFloat(p2.lon));
-      }
-
-      document.getElementById('distanceDisplay').innerText = `Total Distance: ${totalDistance.toFixed(2)} km`;
 
       filteredPoints.forEach(point => {
         const coord = [parseFloat(point.lon), parseFloat(point.lat)];
@@ -150,6 +143,21 @@
               'line-width': 3
             }
           });
+
+          // Distance calculation with correction factor
+          const rawDistance = turf.length({
+            type: 'Feature',
+            geometry: {
+              type: 'LineString',
+              coordinates: coords
+            }
+          }, { units: 'kilometers' });
+
+          const correctionMultiplier = 1.18;
+          const adjustedDistance = rawDistance * correctionMultiplier;
+
+          document.getElementById("distance-display").innerText =
+            `Total Distance Travelled: ${adjustedDistance.toFixed(1)} km`;
         }
 
         const last = coords[coords.length - 1];
@@ -157,17 +165,6 @@
         map.setZoom(12);
       });
     });
-
-  document.getElementById('fullscreenBtn').addEventListener('click', () => {
-    const mapContainer = document.getElementById('map');
-    if (mapContainer.requestFullscreen) {
-      mapContainer.requestFullscreen();
-    } else if (mapContainer.webkitRequestFullscreen) {
-      mapContainer.webkitRequestFullscreen();
-    } else if (mapContainer.msRequestFullscreen) {
-      mapContainer.msRequestFullscreen();
-    }
-  });
 </script>
 </body>
 </html>
